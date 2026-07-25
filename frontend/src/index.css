@@ -1,0 +1,213 @@
+/* ==========================
+   GOOGLE FONT
+========================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* ==========================
+   RESET
+========================== */
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    font-family:"Inter",sans-serif;
+    background:#0B0F19;
+    color:white;
+    overflow-x:hidden;
+}
+
+a{
+    text-decoration:none;
+    color:inherit;
+}
+
+button{
+    font-family:inherit;
+    cursor:pointer;
+}
+
+/* ==========================
+   COLORS
+========================== */
+
+:root{
+
+    --bg:#0B0F19;
+    --card:#151C2E;
+    --primary:#2563EB;
+    --secondary:#06D6FF;
+
+    --text:#FFFFFF;
+    --text2:#BFC7D5;
+
+    --border:#26324A;
+
+}
+
+/* ==========================
+   LOGO
+========================== */
+
+.logo{
+    font-size:34px;
+    font-weight:800;
+    color:var(--secondary);
+    letter-spacing:1px;
+}
+
+/* ==========================
+   HEADINGS
+========================== */
+
+.heading{
+
+    font-size:64px;
+    font-weight:800;
+    color:white;
+    line-height:1.1;
+
+}
+
+.highlight{
+
+    color:var(--secondary);
+
+}
+
+/* ==========================
+   BUTTON
+========================== */
+
+.primary-btn{
+
+    background:linear-gradient(
+        90deg,
+        var(--primary),
+        var(--secondary)
+    );
+
+    color:white;
+
+    border:none;
+
+    padding:15px 34px;
+
+    border-radius:50px;
+
+    font-size:16px;
+
+    font-weight:600;
+
+    transition:.3s;
+
+    box-shadow:
+    0 0 20px rgba(6,214,255,.18);
+
+}
+
+.primary-btn:hover{
+
+    transform:translateY(-3px);
+
+    box-shadow:
+    0 15px 35px rgba(6,214,255,.35);
+
+}
+
+/* ==========================
+   CARD
+========================== */
+
+.card{
+
+    background:var(--card);
+
+    border:1px solid var(--border);
+
+    border-radius:18px;
+
+    padding:30px;
+
+    transition:.35s;
+
+}
+
+.card:hover{
+
+    transform:translateY(-8px);
+
+    border-color:var(--secondary);
+
+    box-shadow:
+    0 15px 35px rgba(6,214,255,.18);
+
+}
+
+/* ==========================
+   TEXT
+========================== */
+
+.subtext{
+
+    color:var(--text2);
+
+    font-size:18px;
+
+    line-height:1.7;
+
+}
+
+/* ==========================
+   NAV LINKS
+========================== */
+
+.nav-link{
+
+    color:white;
+
+    font-weight:600;
+
+    transition:.3s;
+
+    position:relative;
+
+}
+
+.nav-link:hover{
+
+    color:var(--secondary);
+
+}
+
+.nav-link::after{
+
+    content:"";
+
+    position:absolute;
+
+    width:0;
+
+    height:2px;
+
+    left:0;
+
+    bottom:-5px;
+
+    background:var(--secondary);
+
+    transition:.3s;
+
+}
+
+.nav-link:hover::after{
+
+    width:100%;
+
+}
