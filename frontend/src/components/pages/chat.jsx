@@ -2,7 +2,9 @@ import EmojiPicker from "emoji-picker-react";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5000", { autoConnect: false });
+const socket = io("https://smartyhood.onrender.com", {
+  autoConnect: false,
+});
 const ROOM = "neet-general";
 
 const BORDER_COLORS = [
