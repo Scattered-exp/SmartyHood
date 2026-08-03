@@ -16,8 +16,11 @@ const io = new Server(server, {
 });
 
 // SOCKET CONNECTION
+let onlineUsers = 0;
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
+  onlineUsers++;
+io.emit("online_users", onlineUsers);
 
   socket.on("join_room", (room) => {
     socket.join(room);
@@ -30,8 +33,16 @@ socket.on("typing", (data) => {
     socket.to(data.room).emit("user_typing");
   });
   socket.on("disconnect", () => {
-    console.log("User disconnected");
-  });
+  console.log("User disconnected");
+
+  onlineUsers--;
+
+  if (onlineUsers < 0) {
+    onlineUsers = 0;
+  }
+
+  io.emit("online_users", onlineUsers);
+});
 });
 
 app.get("/", (req, res) => {

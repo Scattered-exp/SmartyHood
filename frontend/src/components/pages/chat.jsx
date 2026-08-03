@@ -41,7 +41,7 @@ function Message({ msg, isOwn }) {
     >
       <div
         style={{
-          maxWidth: "70%",
+          maxWidth: "85%",
           display: "flex",
           flexDirection: "column",
           alignItems: isOwn ? "flex-end" : "flex-start",
@@ -104,6 +104,7 @@ export default function Chat() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(0);
   const [typing, setTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
    const [myId, setMyId] = useState("");
@@ -119,6 +120,9 @@ export default function Chat() {
   setMyId(socket.id);
 });
     socket.on("disconnect", () => setConnected(false));
+    socket.on("online_users", (count) => {
+  setOnlineUsers(count);
+});
     socket.emit("join_room", ROOM);
     socket.on("receive_message", (data) => {
       setChat((prev) => [...prev, data]);
@@ -134,6 +138,23 @@ export default function Chat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, typing]);
+  useEffect(() => {
+    const input = inputRef.current;
+
+    const handleFocus = () => {
+        setTimeout(() => {
+            bottomRef.current?.scrollIntoView({
+                behavior: "smooth"
+            });
+        }, 300);
+    };
+
+    input?.addEventListener("focus", handleFocus);
+
+    return () => {
+        input?.removeEventListener("focus", handleFocus);
+    };
+}, []);
   useEffect(() => {
   const handleClickOutside = (event) => {
     if (
@@ -205,7 +226,7 @@ export default function Chat() {
 
         .chat-root {
           font-family: 'Inter', sans-serif;
-          height: 100vh;
+          height: 100dvh;
           display: flex;
           flex-direction: column;
           background: #0d0d1a;
@@ -255,10 +276,12 @@ export default function Chat() {
         }
 
         .messages-area {
-          flex: 1;
-          overflow-y: auto;
-          padding: 20px 20px 8px;
-        }
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    scroll-behavior: smooth;
+}
 
         .messages-area::-webkit-scrollbar { width: 3px; }
         .messages-area::-webkit-scrollbar-track { background: transparent; }
@@ -360,14 +383,57 @@ export default function Chat() {
           transform: translateX(1px);
         }
         .send-btn:disabled svg { stroke: #4a5568; }
+        @media (max-width: 768px) {
+
+  .chat-header {
+    padding: 10px 12px;
+  }
+
+  .header-title {
+    font-size: 14px;
+  }
+
+  .header-sub {
+    font-size: 10px;
+  }
+
+  .conn-pill {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .messages-area {
+    padding: 10px;
+  }
+
+  .input-area {
+    padding: 8px;
+  }
+
+  .chat-input {
+    font-size: 16px;
+  }
+
+}
       `}</style>
 
       <div className="chat-root">
         <div className="chat-header">
           <div>
-            <div className="header-title">SmartyHood Chat</div>
-            <div className="header-sub">neet-general</div>
-          </div>
+  <div className="header-title">SmartyHood Chat</div>
+  <div className="header-sub">neet-general</div>
+
+  <div
+    style={{
+      color: "#34d399",
+      fontSize: "12px",
+      marginTop: "4px",
+      fontWeight: "600"
+    }}
+  >
+    🟢 {onlineUsers} Users Online
+  </div>
+</div>
           <div className="conn-pill">
             <div
               className="conn-dot"
