@@ -112,7 +112,7 @@ export default function Chat() {
   const typingTimeout = useRef(null);
   const inputRef = useRef(null);
   const emojiPickerRef = useRef(null);
-
+  const messagesRef = useRef(null);
   useEffect(() => {
     socket.connect();
     socket.on("connect", () => {
@@ -138,7 +138,9 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+     if (messagesRef.current) {
+    messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+  }
   }, [chat, typing]);
   useEffect(() => {
     const input = inputRef.current;
@@ -445,7 +447,7 @@ export default function Chat() {
           </div>
         </div>
 
-        <div className="messages-area">
+        <div className="messages-area" ref={messagesRef}>
           <div className="date-divider"><span>Today</span></div>
 
           {chat.length === 0 ? (
