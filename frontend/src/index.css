@@ -209,5 +209,53 @@ button{
 .nav-link:hover::after{
 
     width:100%;
-
 }
+/* ==========================
+   RESPONSIVE NAVBAR
+========================== */
+
+.desktop-menu {
+    display: flex;
+    align-items: center;
+    gap: 35px;
+}
+
+.menu-btn {
+    display: none;
+    background: transparent;
+    color: white;
+    border: none;
+    font-size: 30px;
+    cursor: pointer;
+}
+
+.mobile-menu {
+    display: none;
+}
+
+@media (max-width: 768px) {
+
+    .desktop-menu {
+        display: none;
+    }
+
+    .menu-btn {
+        display: block;
+    }
+
+    .mobile-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 20px;
+        background: #111827;
+        border-top: 1px solid #26324A;
+    }
+
+    .mobile-menu .primary-btn {
+        width: 100%;
+    }
+}
+
+
+

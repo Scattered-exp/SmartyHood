@@ -7,7 +7,7 @@ function Home() {
        style={{
   background: "linear-gradient(135deg, #050816, #0f172a, #111827)",
   color: "white",
-  padding: "120px 30px",
+  padding: "clamp(60px, 10vw, 120px) 20px",
   textAlign: "center",
   position: "relative",
   overflow: "hidden"
@@ -16,7 +16,7 @@ function Home() {
        <h1
   className="neon-text"
   style={{
-    fontSize: "64px",
+    fontSize: "clamp(32px, 8vw, 64px)",
     fontWeight: "bold",
     marginBottom: "20px"
   }}
@@ -29,7 +29,7 @@ function Home() {
   style={{
     maxWidth: "700px",
     margin: "auto",
-    fontSize: "22px",
+    fontSize: "clamp(16px, 4vw, 22px)",
     lineHeight: "1.6"
   }}
 >
@@ -40,7 +40,7 @@ function Home() {
   style={{
     marginTop: "40px",
     display: "inline-block",
-    padding: "20px 35px",
+    padding: "15px 20px",
     borderRadius: "18px",
     background: "rgba(255,255,255,0.05)",
     border: "1px solid rgba(255,255,255,0.12)",
@@ -50,7 +50,7 @@ function Home() {
 >
   <p
     style={{
-      fontSize: "22px",
+      fontSize: "clamp(15px, 4vw, 22px)",
       fontWeight: "600",
       lineHeight: "1.8",
       margin: 0,
@@ -70,8 +70,8 @@ function Home() {
         <button
          style={{
   marginTop: "30px",
-  padding: "14px 28px",
-  fontSize: "16px",
+  padding: "12px 24px",
+  fontSize: "clamp(14px,3vw,16px)",
   background: "linear-gradient(90deg, #06b6d4, #8b5cf6)",
   color: "white",
   border: "none",
@@ -87,11 +87,11 @@ function Home() {
       </div>
 
       {/* FEATURES SECTION */}
-      <div style={{ padding: "50px", textAlign: "center" }}>
+      <div style={{ padding: "40px 20px", textAlign: "center" }}>
         <h2
   className="neon-text"
   style={{
-    fontSize: "42px",
+    fontSize: "clamp(28px,6vw,42px)",
     marginBottom: "20px"
   }}
 >
@@ -130,7 +130,8 @@ function Home() {
 
 const cardStyle = {
   padding: "30px",
-  width: "220px",
+  width: "100%",
+maxWidth: "250px",
   background: "rgba(255,255,255,0.05)",
   borderRadius: "20px",
   fontWeight: "bold",
@@ -139,7 +140,7 @@ const cardStyle = {
   boxShadow: "0 0 20px rgba(0,255,255,0.15)",
   backdropFilter: "blur(10px)",
   transition: "0.3s",
-  fontSize: "22px"
+  fontSize: "clamp(16px,4vw,22px)"
 };
 
 export default Home;

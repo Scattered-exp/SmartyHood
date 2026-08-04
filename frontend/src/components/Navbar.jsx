@@ -1,41 +1,101 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 function Navbar() {
-  return (
-    <nav
-      style={{
-        height: "80px",
-        padding: "0 70px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: "#0B0F19",
-        borderBottom: "1px solid #26324A",
-        position: "sticky",
-        top: 0,
-        zIndex: 1000
-      }}
-    >
-      <div className="logo">SmartyHood</div>
+  const [menuOpen, setMenuOpen] = useState(false);
 
-      <div
+  return (
+    <>
+      <nav
         style={{
-          display: "flex",
-          gap: "40px",
-          alignItems: "center"
+          background: "#0B0F19",
+          borderBottom: "1px solid #26324A",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
         }}
       >
-        <Link className="nav-link" to="/">Home</Link>
-        <Link className="nav-link" to="/modules">Modules</Link>
-        <Link className="nav-link" to="/chat">Chat</Link>
-      </div>
+        <div
+          style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            padding: "15px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div
+            className="logo"
+            style={{
+              fontSize: "30px",
+              fontWeight: "800",
+            }}
+          >
+            SmartyHood
+          </div>
 
-      <Link to="/login">
-        <button className="primary-btn">
-          Login
-        </button>
-      </Link>
-    </nav>
+          {/* Desktop Menu */}
+          <div className="desktop-menu">
+            <Link className="nav-link" to="/">
+              Home
+            </Link>
+
+            <Link className="nav-link" to="/modules">
+              Modules
+            </Link>
+
+            <Link className="nav-link" to="/chat">
+              Chat
+            </Link>
+
+            <Link to="/login">
+              <button className="primary-btn">Login</button>
+            </Link>
+          </div>
+
+          {/* Mobile Button */}
+          <button
+            className="menu-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+        </div>
+
+        {menuOpen && (
+          <div className="mobile-menu">
+            <Link
+              className="nav-link"
+              to="/"
+              onClick={() => setMenuOpen(false)}
+            >
+              Home
+            </Link>
+
+            <Link
+              className="nav-link"
+              to="/modules"
+              onClick={() => setMenuOpen(false)}
+            >
+              Modules
+            </Link>
+
+            <Link
+              className="nav-link"
+              to="/chat"
+              onClick={() => setMenuOpen(false)}
+            >
+              Chat
+            </Link>
+
+            <Link to="/login" onClick={() => setMenuOpen(false)}>
+              <button className="primary-btn">Login</button>
+            </Link>
+          </div>
+        )}
+      </nav>
+    </>
   );
 }
 

@@ -118,6 +118,8 @@ export default function Chat() {
     socket.on("connect", () => {
   setConnected(true);
   setMyId(socket.id);
+  socket.emit("join_room", ROOM);
+  
 });
     socket.on("disconnect", () => setConnected(false));
     socket.on("online_users", (count) => {
