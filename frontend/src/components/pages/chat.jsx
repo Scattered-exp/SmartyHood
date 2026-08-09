@@ -2,8 +2,8 @@ import EmojiPicker from "emoji-picker-react";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("https://smartyhood.onrender.com", {
-  autoConnect: false,
+const socket = io("http://localhost:5000", {
+    autoConnect: false
 });
 const ROOM = "neet-general";
 
@@ -115,27 +115,52 @@ export default function Chat() {
   const messagesRef = useRef(null);
   useEffect(() => {
     socket.connect();
+
     socket.on("connect", () => {
-  setConnected(true);
-  setMyId(socket.id);
-  socket.emit("join_room", ROOM);
-  
-});
-    socket.on("disconnect", () => setConnected(false));
+        console.log("Frontend connected:", socket.id);
+
+        setConnected(true);
+        setMyId(socket.id);
+
+        socket.emit("join_room", ROOM);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Frontend disconnected");
+        setConnected(false);
+    });
+
     socket.on("online_users", (count) => {
-  setOnlineUsers(count);
-});
-    socket.emit("join_room", ROOM);
+        console.log("Online users:", count);
+        setOnlineUsers(count);
+    });
+
     socket.on("receive_message", (data) => {
-      setChat((prev) => [...prev, data]);
+        console.log("Message received in frontend:", data);
+
+        setChat((prev) => [...prev, data]);
     });
+
     socket.on("user_typing", () => {
-      setTyping(true);
-      clearTimeout(typingTimeout.current);
-      typingTimeout.current = setTimeout(() => setTyping(false), 2000);
+        setTyping(true);
+
+        clearTimeout(typingTimeout.current);
+
+        typingTimeout.current = setTimeout(() => {
+            setTyping(false);
+        }, 2000);
     });
-    return () => socket.disconnect();
-  }, []);
+
+    return () => {
+        socket.off("connect");
+        socket.off("disconnect");
+        socket.off("online_users");
+        socket.off("receive_message");
+        socket.off("user_typing");
+
+        socket.disconnect();
+    };
+}, []);
 
   useEffect(() => {
      if (messagesRef.current) {
