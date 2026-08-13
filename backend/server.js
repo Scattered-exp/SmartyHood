@@ -32,6 +32,10 @@ const io = new Server(server, {
 });
 app.post("/api/login", (req, res) => {
     const { username, password } = req.body;
+    console.log("Login username received:", username);
+console.log("ADMIN_USERNAME exists:", !!process.env.ADMIN_USERNAME);
+console.log("ADMIN_PASSWORD exists:", !!process.env.ADMIN_PASSWORD);
+console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 
     if (
         username !== process.env.ADMIN_USERNAME ||
