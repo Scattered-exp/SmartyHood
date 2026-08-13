@@ -2,7 +2,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Home from "./components/pages/home";
-import Login from "./components/pages/login";
+
 import Register from "./components/pages/register";
 import Modules from "./components/pages/modules";
 import Chat from "./components/pages/chat";
@@ -22,7 +22,7 @@ function App() {
             <Routes>
 
                 {/* LOGIN */}
-                <Route path="/" element={<Login />} />
+                <Route path="/" element={<Home />} />
 
                 <Route path="/login" element={<Login />} />
 

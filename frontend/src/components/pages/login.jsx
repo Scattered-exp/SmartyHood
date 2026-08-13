@@ -17,7 +17,7 @@ function Login() {
         setLoading(true);
 
         try {
-            const response = await fetch("https://smartyhood.onrender.com/api/login", {
+            const response = await fetch("https://smartyhood-1.onrender.com/api/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
