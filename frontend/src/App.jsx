@@ -11,9 +11,7 @@ import ProtectedRoute from "./ProtectedRoute";
 function App() {
     const location = useLocation();
 
-    const hideNavbar =
-        location.pathname === "/" ||
-        location.pathname === "/login";
+    const hideNavbar = location.pathname === "/login";
 
     return (
         <>
