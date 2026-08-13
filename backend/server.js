@@ -56,7 +56,7 @@ app.post("/api/login", (req, res) => {
     res.cookie("token", token, {
         httpOnly: true,
         secure: false,
-        sameSite: "lax",
+        sameSite: "none",
         maxAge: 24 * 60 * 60 * 1000
     });
 
@@ -100,7 +100,11 @@ app.get("/api/auth/me", authenticate, (req, res) => {
     });
 });
 app.post("/api/logout", (req, res) => {
-    res.clearCookie("token");
+    res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none"
+});
 
     res.json({
         message: "Logged out successfully"
