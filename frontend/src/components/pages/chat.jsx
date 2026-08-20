@@ -114,53 +114,58 @@ export default function Chat() {
   const inputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const messagesRef = useRef(null);
-  useEffect(() => {
-    socket.connect();
+ useEffect(() => {
+  const handleConnect = () => {
+    console.log("Frontend connected:", socket.id);
+    setConnected(true);
+    setMyId(socket.id);
+    socket.emit("join_room", ROOM);
+  };
 
-    socket.on("connect", () => {
-        console.log("Frontend connected:", socket.id);
+  const handleDisconnect = () => {
+    console.log("Frontend disconnected");
+    setConnected(false);
+  };
 
-        setConnected(true);
-        setMyId(socket.id);
+  const handleOnlineUsers = (count) => {
+    console.log("Online users:", count);
+    setOnlineUsers(count);
+  };
 
-        socket.emit("join_room", ROOM);
-    });
+  const handleReceiveMessage = (data) => {
+    console.log("Message received in frontend:", data);
+    setChat((prev) => [...prev, data]);
+  };
 
-    socket.on("disconnect", () => {
-        console.log("Frontend disconnected");
-        setConnected(false);
-    });
+  const handleTyping = () => {
+    setTyping(true);
 
-    socket.on("online_users", (count) => {
-        console.log("Online users:", count);
-        setOnlineUsers(count);
-    });
+    clearTimeout(typingTimeout.current);
 
-    socket.on("receive_message", (data) => {
-        console.log("Message received in frontend:", data);
+    typingTimeout.current = setTimeout(() => {
+      setTyping(false);
+    }, 2000);
+  };
 
-        setChat((prev) => [...prev, data]);
-    });
+  // Register listeners FIRST
+  socket.on("connect", handleConnect);
+  socket.on("disconnect", handleDisconnect);
+  socket.on("online_users", handleOnlineUsers);
+  socket.on("receive_message", handleReceiveMessage);
+  socket.on("user_typing", handleTyping);
 
-    socket.on("user_typing", () => {
-        setTyping(true);
+  // Connect AFTER listeners are registered
+  socket.connect();
 
-        clearTimeout(typingTimeout.current);
+  return () => {
+    socket.off("connect", handleConnect);
+    socket.off("disconnect", handleDisconnect);
+    socket.off("online_users", handleOnlineUsers);
+    socket.off("receive_message", handleReceiveMessage);
+    socket.off("user_typing", handleTyping);
 
-        typingTimeout.current = setTimeout(() => {
-            setTyping(false);
-        }, 2000);
-    });
-
-    return () => {
-        socket.off("connect");
-        socket.off("disconnect");
-        socket.off("online_users");
-        socket.off("receive_message");
-        socket.off("user_typing");
-
-        socket.disconnect();
-    };
+    socket.disconnect();
+  };
 }, []);
 
   useEffect(() => {
