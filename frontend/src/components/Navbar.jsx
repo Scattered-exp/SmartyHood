@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 function Navbar() {
+
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+
     <>
       <nav
         style={{
@@ -25,6 +27,8 @@ function Navbar() {
             alignItems: "center",
           }}
         >
+
+          {/* Logo */}
           <div
             className="logo"
             style={{
@@ -37,6 +41,7 @@ function Navbar() {
 
           {/* Desktop Menu */}
           <div className="desktop-menu">
+
             <Link className="nav-link" to="/">
               Home
             </Link>
@@ -49,9 +54,6 @@ function Navbar() {
               Chat
             </Link>
 
-            <Link to="/login">
-              <button className="primary-btn">Login</button>
-            </Link>
           </div>
 
           {/* Mobile Button */}
@@ -61,10 +63,14 @@ function Navbar() {
           >
             {menuOpen ? "✕" : "☰"}
           </button>
+
         </div>
 
+        {/* Mobile Menu */}
         {menuOpen && (
+
           <div className="mobile-menu">
+
             <Link
               className="nav-link"
               to="/"
@@ -89,11 +95,10 @@ function Navbar() {
               Chat
             </Link>
 
-            <Link to="/login" onClick={() => setMenuOpen(false)}>
-              <button className="primary-btn">Login</button>
-            </Link>
           </div>
+
         )}
+
       </nav>
     </>
   );

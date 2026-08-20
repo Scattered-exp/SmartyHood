@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
 const socket = io("https://smartyhood-1.onrender.com", {
-  autoConnect: false
+    autoConnect: false
 });
 
 const ROOM = "neet-general";

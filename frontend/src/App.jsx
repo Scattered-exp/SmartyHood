@@ -1,72 +1,28 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Home from "./components/pages/home";
-import Login from "./components/pages/login";
-import Register from "./components/pages/register";
 import Modules from "./components/pages/modules";
 import Chat from "./components/pages/chat";
-import ProtectedRoute from "./ProtectedRoute";
 
 function App() {
-    const location = useLocation();
-
-    const hideNavbar = location.pathname === "/login";
-
     return (
         <>
-            {!hideNavbar && <Navbar />}
+            <Navbar />
 
             <Routes>
-
-                {/* LOGIN */}
+                {/* Home */}
                 <Route path="/" element={<Home />} />
+                <Route path="/home" element={<Home />} />
 
-                <Route path="/login" element={<Login />} />
+                {/* Modules */}
+                <Route path="/modules" element={<Modules />} />
 
-                {/* PROTECTED HOME */}
-                <Route
-                    path="/home"
-                    element={
-                        <ProtectedRoute>
-                            <Home />
-                        </ProtectedRoute>
-                    }
-                />
+                {/* Chat */}
+                <Route path="/chat" element={<Chat />} />
 
-                {/* PROTECTED MODULES */}
-                <Route
-                    path="/modules"
-                    element={
-                        <ProtectedRoute>
-                            <Modules />
-                        </ProtectedRoute>
-                    }
-                />
-
-                {/* PROTECTED CHAT */}
-                <Route
-                    path="/chat"
-                    element={
-                        <ProtectedRoute>
-                            <Chat />
-                        </ProtectedRoute>
-                    }
-                />
-
-                {/* PROTECTED REGISTER */}
-                <Route
-                    path="/register"
-                    element={
-                        <ProtectedRoute>
-                            <Register />
-                        </ProtectedRoute>
-                    }
-                />
-
-                {/* ANY UNKNOWN URL */}
-                <Route path="*" element={<Login />} />
-
+                {/* Redirect unknown pages to Home */}
+                <Route path="*" element={<Home />} />
             </Routes>
         </>
     );
