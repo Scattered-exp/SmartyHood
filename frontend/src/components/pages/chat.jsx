@@ -202,9 +202,9 @@ export default function Chat() {
   const [myId, setMyId] = useState("");
 
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraMode, setCameraMode] = useState("photo");
-  const [recording, setRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
+const [cameraMode, setCameraMode] = useState("photo");
+const [recording, setRecording] = useState(false);
+const [cameraFacing, setCameraFacing] = useState("environment");
 
   const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -424,32 +424,69 @@ export default function Chat() {
   // ==============================
 
   const openCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: cameraFacing,
+      },
+      audio: true,
+    });
+
+    cameraStreamRef.current = stream;
+
+    setCameraMode("photo");
+    setCameraOpen(true);
+
+    setTimeout(() => {
+      if (cameraVideoRef.current) {
+        cameraVideoRef.current.srcObject = stream;
+      }
+    }, 100);
+  } catch (error) {
+    console.error("Camera error:", error);
+
+    alert(
+      "Camera access was denied or is not available. Please allow camera permission."
+    );
+  }
+};
+
+const flipCamera = async () => {
+  if (recording) return;
+
+  const newFacing =
+    cameraFacing === "environment"
+      ? "user"
+      : "environment";
+
+  try {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current
+        .getTracks()
+        .forEach((track) => track.stop());
+    }
+
+    const newStream =
+      await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "environment",
+          facingMode: newFacing,
         },
         audio: true,
       });
 
-      cameraStreamRef.current = stream;
+    cameraStreamRef.current = newStream;
 
-      setCameraMode("photo");
-      setCameraOpen(true);
+    setCameraFacing(newFacing);
 
-      setTimeout(() => {
-        if (cameraVideoRef.current) {
-          cameraVideoRef.current.srcObject = stream;
-        }
-      }, 100);
-    } catch (error) {
-      console.error("Camera error:", error);
-
-      alert(
-        "Camera access was denied or is not available. Please allow camera permission."
-      );
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = newStream;
     }
-  };
+  } catch (error) {
+    console.error("Could not flip camera:", error);
+
+    alert("Unable to switch camera.");
+  }
+};
 
   const stopCamera = () => {
     if (mediaRecorderRef.current?.state === "recording") {
@@ -758,24 +795,28 @@ export default function Chat() {
         }
 
         .input-area {
-          background: #11112a;
-          border-top: 1px solid #1e1e3f;
-          padding: 12px 16px;
-          display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          flex-shrink: 0;
-        }
+  background: #11112a;
+  border-top: 1px solid #1e1e3f;
+  padding: 10px 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+}
 
         .input-wrap {
-          flex: 1;
-          background: #1a1a2e;
-          border: 1px solid #2d2d52;
-          border-radius: 20px;
-          display: flex;
-          align-items: center;
-          padding: 0 14px;
-        }
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  background: #1a1a2e;
+  border: 1px solid #2d2d52;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+}
 
         .input-wrap:focus-within {
           border-color: #a78bfa;
@@ -903,6 +944,27 @@ export default function Chat() {
           font-size: 22px;
           cursor: pointer;
         }
+          .camera-flip {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.camera-flip:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.camera-flip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
         .recording-counter {
           background: #ef4444;
@@ -956,22 +1018,66 @@ export default function Chat() {
         }
 
         @media (max-width: 768px) {
-          .chat-header {
-            padding: 10px 12px;
-          }
+  .chat-header {
+    padding: 10px 12px;
+  }
 
-          .messages-area {
-            padding: 10px;
-          }
+  .header-title {
+    font-size: 14px;
+  }
 
-          .input-area {
-            padding: 8px;
-          }
+  .header-sub {
+    font-size: 10px;
+  }
 
-          .chat-input {
-            font-size: 16px;
-          }
-        }
+  .conn-pill {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .messages-area {
+    padding: 10px 8px;
+  }
+
+  .input-area {
+    padding: 7px 6px;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .media-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    font-size: 16px;
+  }
+
+  .input-wrap {
+    min-width: 0;
+    width: auto;
+  }
+
+  .chat-input {
+    font-size: 16px;
+    min-width: 0;
+    padding: 8px 0;
+  }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .send-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .camera-box {
+    width: 94vw;
+  }
+}
       `}</style>
 
       <div
@@ -1159,20 +1265,29 @@ export default function Chat() {
       {cameraOpen && (
         <div className="camera-overlay">
           <div className="camera-box">
-            <div className="camera-top">
-              <button
-                className="camera-close"
-                onClick={stopCamera}
-              >
-                ✕
-              </button>
+           <div className="camera-top">
+  <button
+    className="camera-close"
+    onClick={stopCamera}
+  >
+    ✕
+  </button>
 
-              {recording && (
-                <div className="recording-counter">
-                  🔴 {recordingSeconds}s / 30s
-                </div>
-              )}
-            </div>
+  <button
+    className="camera-flip"
+    onClick={flipCamera}
+    disabled={recording}
+    title="Flip camera"
+  >
+    🔄
+  </button>
+
+  {recording && (
+    <div className="recording-counter">
+      🔴 {recordingSeconds}s / 30s
+    </div>
+  )}
+</div>
 
             <video
               ref={cameraVideoRef}
