@@ -1,4 +1,6 @@
-require("dotenv").config({ path: __dirname + "/.env" });
+require("dotenv").config({
+  path: __dirname + "/.env",
+});
 
 const express = require("express");
 const http = require("http");
@@ -11,83 +13,165 @@ const app = express();
 app.use(express.json());
 
 app.use(
-    cors({
-        origin: "https://smartyhood-frontend.onrender.com"
-    })
+  cors({
+    origin: "https://smartyhood-frontend.onrender.com",
+  })
 );
 
-// MongoDB Connection
+// ==============================
+// MONGODB
+// ==============================
+
 mongoose
-    .connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 10000
-    })
-    .then(() => console.log("MongoDB connected successfully"))
-    .catch((err) => console.error("MongoDB connection error:", err));
+  .connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+  })
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) =>
+    console.error("MongoDB connection error:", err)
+  );
+
+// ==============================
+// HTTP SERVER
+// ==============================
 
 const server = http.createServer(app);
 
-// Socket.io
+// ==============================
+// SOCKET.IO
+// ==============================
+
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+
+  // Allows temporary photo/video messages.
+  // 50 MB maximum per Socket.IO message.
+  maxHttpBufferSize: 50 * 1024 * 1024,
 });
 
-// SOCKET CONNECTION
+// ==============================
+// ONLINE USERS
+// ==============================
 
 let onlineUsers = 0;
 
 io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
 
-    console.log("User connected:", socket.id);
+  onlineUsers++;
 
-    onlineUsers++;
+  io.emit("online_users", onlineUsers);
 
-    io.emit("online_users", onlineUsers);
+  // ==============================
+  // JOIN CHAT ROOM
+  // ==============================
 
-    socket.on("join_room", (room) => {
+  socket.on("join_room", (room) => {
+    console.log(
+      `User ${socket.id} joined room: ${room}`
+    );
 
-        console.log("User joined room:", room);
+    socket.join(room);
+  });
 
-        socket.join(room);
-    });
+  // ==============================
+  // SEND MESSAGE
+  // ==============================
 
-    socket.on("send_message", (data) => {
+  socket.on("send_message", (data) => {
+    console.log(
+      "Message received:",
+      data.type,
+      data.mediaType || ""
+    );
 
-        console.log("Message received:", data);
+    /*
+      IMPORTANT:
 
-        io.to(data.room).emit("receive_message", data);
-    });
+      Nothing is saved to MongoDB.
 
-    socket.on("typing", (data) => {
+      The message only lives temporarily
+      inside the connected clients.
+    */
 
-        console.log("User is typing in room:", data.room);
+    io.to(data.room).emit(
+      "receive_message",
+      data
+    );
+  });
 
-        socket.to(data.room).emit("user_typing");
-    });
+  // ==============================
+  // TYPING
+  // ==============================
 
-    socket.on("disconnect", () => {
+  socket.on("typing", (data) => {
+    socket
+      .to(data.room)
+      .emit("user_typing");
+  });
 
-        console.log("User disconnected:", socket.id);
+  // ==============================
+  // CLEAR CHAT
+  // ==============================
 
-        onlineUsers--;
+  socket.on("leave_chat", (room) => {
+    console.log(
+      `User ${socket.id} left chat: ${room}`
+    );
 
-        if (onlineUsers < 0) {
-            onlineUsers = 0;
-        }
+    /*
+      Clear the temporary chat for everyone
+      currently connected to the room.
+    */
 
-        io.emit("online_users", onlineUsers);
-    });
+    io.to(room).emit("clear_chat");
+
+    socket.leave(room);
+  });
+
+  // ==============================
+  // DISCONNECT
+  // ==============================
+
+  socket.on("disconnect", () => {
+    console.log(
+      "User disconnected:",
+      socket.id
+    );
+
+    onlineUsers--;
+
+    if (onlineUsers < 0) {
+      onlineUsers = 0;
+    }
+
+    io.emit(
+      "online_users",
+      onlineUsers
+    );
+  });
 });
 
-// Test route
+// ==============================
+// TEST ROUTE
+// ==============================
+
 app.get("/", (req, res) => {
-    res.send("SmartyHood Backend Running");
+  res.send("SmartyHood Backend Running");
 });
 
-const PORT = process.env.PORT || 5000;
+// ==============================
+// START SERVER
+// ==============================
+
+const PORT =
+  process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(
+    `Server running on port ${PORT}`
+  );
 });
