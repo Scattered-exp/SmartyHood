@@ -17,8 +17,12 @@ const BORDER_COLORS = [
   "#facc15",
 ];
 
-function Message({ msg, isOwn }) {
-  const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
+function Message({ msg, isOwn, onDelete }) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const time = new Date(
+    msg.timestamp || Date.now()
+  ).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -45,6 +49,7 @@ function Message({ msg, isOwn }) {
       >
         <div
           style={{
+            position: "relative",
             background: "#1a1a2e",
             color: "#e2e8f0",
             padding: msg.type === "media" ? "5px" : "10px 14px",
@@ -56,13 +61,76 @@ function Message({ msg, isOwn }) {
             border: `1.5px solid ${borderColor}`,
             wordBreak: "break-word",
             boxShadow: `0 0 10px ${borderColor}22`,
-            overflow: "hidden",
+            overflow: "visible",
           }}
         >
           {msg.type === "media" ? (
             <MediaMessage msg={msg} />
           ) : (
             msg.message
+          )}
+
+          {/* THREE DOT MENU - OWN MESSAGES ONLY */}
+          {isOwn && (
+            <div
+              style={{
+                position: "absolute",
+                top: 4,
+                right: 5,
+              }}
+            >
+              <button
+                onClick={() => setShowMenu((prev) => !prev)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: "2px 4px",
+                }}
+              >
+                ⋮
+              </button>
+
+              {showMenu && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 25,
+                    right: 0,
+                    background: "#11112a",
+                    border: "1px solid #2d2d52",
+                    borderRadius: 8,
+                    padding: 5,
+                    minWidth: 150,
+                    zIndex: 1000,
+                    boxShadow: "0 8px 25px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onDelete(msg.id);
+                    }}
+                    style={{
+                      width: "100%",
+                      background: "transparent",
+                      border: "none",
+                      color: "#f87171",
+                      padding: "9px 10px",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      borderRadius: 6,
+                    }}
+                  >
+                    🗑️ Delete for Everyone
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -204,7 +272,7 @@ export default function Chat() {
   const [cameraOpen, setCameraOpen] = useState(false);
 const [cameraMode, setCameraMode] = useState("photo");
 const [recording, setRecording] = useState(false);
-const [cameraFacing, setCameraFacing] = useState("environment");
+
 
   const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -245,6 +313,11 @@ const [cameraFacing, setCameraFacing] = useState("environment");
 
       setChat((prev) => [...prev, data]);
     };
+    const handleMessageDeleted = (data) => {
+  setChat((prev) =>
+    prev.filter((msg) => msg.id !== data.messageId)
+  );
+};
 
     const handleClearChat = () => {
       setChat([]);
@@ -264,6 +337,7 @@ const [cameraFacing, setCameraFacing] = useState("environment");
     socket.on("disconnect", handleDisconnect);
     socket.on("online_users", handleOnlineUsers);
     socket.on("receive_message", handleReceiveMessage);
+    socket.on("message_deleted", handleMessageDeleted);
     socket.on("clear_chat", handleClearChat);
     socket.on("user_typing", handleTyping);
 
@@ -280,10 +354,11 @@ const [cameraFacing, setCameraFacing] = useState("environment");
       socket.off("disconnect", handleDisconnect);
       socket.off("online_users", handleOnlineUsers);
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("message_deleted", handleMessageDeleted);
       socket.off("clear_chat", handleClearChat);
       socket.off("user_typing", handleTyping);
 
-      stopCamera();
+      
 
       socket.disconnect();
     };
@@ -334,18 +409,47 @@ const [cameraFacing, setCameraFacing] = useState("environment");
     if (!message.trim()) return;
 
     const data = {
-      room: ROOM,
-      type: "text",
-      message: message.trim(),
-      sender: socket.id,
-      timestamp: Date.now(),
-    };
+  id: `${socket.id}-${Date.now()}-${Math.random()}`,
+  room: ROOM,
+  type: "text",
+  message: message.trim(),
+  sender: socket.id,
+  timestamp: Date.now(),
+};
 
     socket.emit("send_message", data);
 
     setMessage("");
 
     inputRef.current?.focus();
+  };
+  // ==============================
+  // DELETE MESSAGE FOR EVERYONE
+  // ==============================
+  const deleteMessage = (messageId) => {
+    const msg = chat.find((item) => item.id === messageId);
+
+    if (!msg) {
+      console.error("Message not found:", messageId);
+      return;
+    }
+
+    // Only the original sender can delete the message.
+    if (msg.sender !== myId) {
+      console.error("You can only delete your own messages.");
+      return;
+    }
+
+    if (!socket.connected) {
+      console.error("Socket is not connected.");
+      return;
+    }
+
+    socket.emit("delete_message", {
+      room: ROOM,
+      messageId: messageId,
+      sender: myId,
+    });
   };
 
   const handleKeyDown = (e) => {
@@ -407,14 +511,15 @@ const [cameraFacing, setCameraFacing] = useState("environment");
       : "video";
 
     const data = {
-      room: ROOM,
-      type: "media",
-      mediaType,
-      mimeType: file.type,
-      file,
-      sender: socket.id,
-      timestamp: Date.now(),
-    };
+  id: `${socket.id}-${Date.now()}-${Math.random()}`,
+  room: ROOM,
+  type: "media",
+  mediaType,
+  mimeType: file.type,
+  file,
+  sender: socket.id,
+  timestamp: Date.now(),
+};
 
     socket.emit("send_message", data);
   };
@@ -423,11 +528,11 @@ const [cameraFacing, setCameraFacing] = useState("environment");
   // CAMERA
   // ==============================
 
-  const openCamera = async () => {
+ const openCamera = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: cameraFacing,
+        facingMode: "user",
       },
       audio: true,
     });
@@ -440,8 +545,13 @@ const [cameraFacing, setCameraFacing] = useState("environment");
     setTimeout(() => {
       if (cameraVideoRef.current) {
         cameraVideoRef.current.srcObject = stream;
+
+        cameraVideoRef.current.play().catch((error) => {
+          console.log("Camera play error:", error);
+        });
       }
     }, 100);
+
   } catch (error) {
     console.error("Camera error:", error);
 
@@ -451,106 +561,86 @@ const [cameraFacing, setCameraFacing] = useState("environment");
   }
 };
 
-const flipCamera = async () => {
-  if (recording) return;
 
-  const newFacing =
-    cameraFacing === "environment"
-      ? "user"
-      : "environment";
-
-  try {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current
-        .getTracks()
-        .forEach((track) => track.stop());
-    }
-
-    const newStream =
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: newFacing,
-        },
-        audio: true,
-      });
-
-    cameraStreamRef.current = newStream;
-
-    setCameraFacing(newFacing);
-
-    if (cameraVideoRef.current) {
-      cameraVideoRef.current.srcObject = newStream;
-    }
-  } catch (error) {
-    console.error("Could not flip camera:", error);
-
-    alert("Unable to switch camera.");
+ const stopCamera = () => {
+  // Stop all camera/microphone tracks
+  if (cameraStreamRef.current) {
+    cameraStreamRef.current.getTracks().forEach((track) => {
+      track.stop();
+    });
+    cameraStreamRef.current = null;
   }
+
+  // Completely disconnect video element
+  if (cameraVideoRef.current) {
+    cameraVideoRef.current.pause();
+    cameraVideoRef.current.srcObject = null;
+  }
+
+  // Stop recording timer
+  if (recordingTimerRef.current) {
+    clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+  }
+
+  // Clear recorder
+  mediaRecorderRef.current = null;
+  recordedChunksRef.current = [];
+
+  // Reset camera state
+  setRecording(false);
+  setRecordingSeconds(0);
+  setCameraOpen(false);
 };
 
-  const stopCamera = () => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-
-      cameraStreamRef.current = null;
-    }
-
-    if (cameraVideoRef.current) {
-      cameraVideoRef.current.srcObject = null;
-    }
-
-    mediaRecorderRef.current = null;
-
-    recordedChunksRef.current = [];
-
-    setRecording(false);
-    setRecordingSeconds(0);
-    setCameraOpen(false);
-  };
-
   const capturePhoto = () => {
-    const video = cameraVideoRef.current;
+  const video = cameraVideoRef.current;
 
-    if (!video) return;
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    alert("Camera is not ready yet. Please wait a moment.");
+    return;
+  }
 
-    const canvas = document.createElement("canvas");
+  const canvas = document.createElement("canvas");
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-    const context = canvas.getContext("2d");
+  const context = canvas.getContext("2d");
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  context.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
+  canvas.toBlob(
+    (blob) => {
+      if (!blob) {
+        alert("Could not capture photo.");
+        return;
+      }
 
-        const file = new File(
-          [blob],
-          `smartyhood-photo-${Date.now()}.jpg`,
-          {
-            type: "image/jpeg",
-          }
-        );
+      const file = new File(
+        [blob],
+        `smartyhood-photo-${Date.now()}.jpg`,
+        {
+          type: "image/jpeg",
+        }
+      );
 
-        sendMedia(file);
+      // Close camera immediately
+      stopCamera();
 
-        stopCamera();
-      },
-      "image/jpeg",
-      0.85
-    );
-  };
+      // Send photo
+      sendMedia(file);
+    },
+    "image/jpeg",
+    0.85
+  );
+};
 
   const startVideoRecording = () => {
     if (!cameraStreamRef.current) return;
@@ -1140,11 +1230,12 @@ const flipCamera = async () => {
               <p>No messages yet. Say something!</p>
             </div>
           ) : (
-            chat.map((msg, i) => (
+            chat.map((msg) => (
               <Message
-                key={i}
+                key={msg.id}
                 msg={msg}
                 isOwn={msg.sender === myId}
+                onDelete={deleteMessage}
               />
             ))
           )}
@@ -1265,28 +1356,16 @@ const flipCamera = async () => {
       {cameraOpen && (
         <div className="camera-overlay">
           <div className="camera-box">
-           <div className="camera-top">
-  <button
-    className="camera-close"
-    onClick={stopCamera}
-  >
-    ✕
-  </button>
+<div className="camera-top">
 
-  <button
-    className="camera-flip"
-    onClick={flipCamera}
-    disabled={recording}
-    title="Flip camera"
-  >
-    🔄
-  </button>
+  
 
   {recording && (
     <div className="recording-counter">
       🔴 {recordingSeconds}s / 30s
     </div>
   )}
+
 </div>
 
             <video

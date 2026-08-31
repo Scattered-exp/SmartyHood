@@ -90,7 +90,6 @@ io.on("connection", (socket) => {
 
     /*
       IMPORTANT:
-
       Nothing is saved to MongoDB.
 
       The message only lives temporarily
@@ -100,6 +99,38 @@ io.on("connection", (socket) => {
     io.to(data.room).emit(
       "receive_message",
       data
+    );
+  });
+
+  // ==============================
+  // DELETE MESSAGE FOR EVERYONE
+  // ==============================
+
+  socket.on("delete_message", (data) => {
+    console.log(
+      "Delete message:",
+      data.messageId
+    );
+
+    // Security check:
+    // Only the person who originally sent
+    // the message can request deletion.
+    if (data.sender !== socket.id) {
+      console.log(
+        "Delete rejected: sender does not match socket"
+      );
+
+      return;
+    }
+
+    // Tell everyone inside the same room
+    // to remove this message.
+    io.to(data.room).emit(
+      "message_deleted",
+      {
+        messageId: data.messageId,
+        sender: socket.id,
+      }
     );
   });
 
