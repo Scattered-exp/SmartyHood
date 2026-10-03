@@ -18,6 +18,20 @@ const BORDER_COLORS = [
 ];
 
 function Message({ msg, isOwn, onDelete }) {
+  if (msg.type === "system") {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        color: "#64748b",
+        fontSize: 12,
+        margin: "12px 0",
+      }}
+    >
+      {msg.message}
+    </div>
+  );
+}
   const [showMenu, setShowMenu] = useState(false);
 
   const time = new Date(
@@ -332,6 +346,19 @@ const [recording, setRecording] = useState(false);
         setTyping(false);
       }, 2000);
     };
+    const handleUserLeft = (user) => {
+  console.log(`User ${user.userNumber} left the chat`);
+
+  setChat((prev) => [
+    ...prev,
+    {
+      id: `system-left-${user.userId}-${Date.now()}`,
+      type: "system",
+      message: `User ${user.userNumber} left the chat`,
+      timestamp: Date.now(),
+    },
+  ]);
+};
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -340,7 +367,7 @@ const [recording, setRecording] = useState(false);
     socket.on("message_deleted", handleMessageDeleted);
     socket.on("clear_chat", handleClearChat);
     socket.on("user_typing", handleTyping);
-
+  socket.on("user_left", handleUserLeft);
     socket.connect();
 
     return () => {
@@ -357,7 +384,7 @@ const [recording, setRecording] = useState(false);
       socket.off("message_deleted", handleMessageDeleted);
       socket.off("clear_chat", handleClearChat);
       socket.off("user_typing", handleTyping);
-
+      socket.off("user_left", handleUserLeft);
       
 
       socket.disconnect();
