@@ -1310,7 +1310,26 @@ const [recording, setRecording] = useState(false);
       `}</style>
 
       {chatAccess === "loading" && (
-        <div style={{ minHeight: "100vh", background: "#0f0f1b" }} />
+        <div
+          style={{
+            minHeight: "85vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#0f0f1b",
+            color: "#94a3b8",
+            fontSize: "16px",
+            fontFamily: "'Inter', sans-serif",
+            gap: "14px",
+          }}
+        >
+          <div
+            className="status-spinner"
+            style={{ width: "30px", height: "30px", borderWidth: "2.5px" }}
+          />
+          <span>Just a second...</span>
+        </div>
       )}
 
       {chatAccess === "full" && (
