@@ -1310,17 +1310,7 @@ const [recording, setRecording] = useState(false);
       `}</style>
 
       {chatAccess === "loading" && (
-        <div className="chat-status-screen">
-          <div className="status-card">
-            <div className="status-spinner" />
-            <h3 style={{ color: "#e2e8f0", margin: "16px 0 8px", fontSize: "18px" }}>
-              Connecting to Chat...
-            </h3>
-            <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-              Checking room limit (Max 3 users allowed)
-            </p>
-          </div>
-        </div>
+        <div style={{ minHeight: "100vh", background: "#0f0f1b" }} />
       )}
 
       {chatAccess === "full" && (
