@@ -69,11 +69,6 @@ const io = new Server(server, {
 const PUBLIC_CHAT_ROOM = "neet-general";
 const MAX_PUBLIC_CHAT_USERS = 3;
 
-// Display numbers are never reused during the server lifetime.
-// NOTE: this is NOT the number of connected users. After a refresh a
-// user can become "User 4" even though only 3 people are online.
-let nextUserNumber = 1;
-
 // Currently connected public-chat users.
 // Map: socket.id -> user information
 const publicChatUsers = new Map();
@@ -88,13 +83,31 @@ const activeCalls = new Map();
 // HELPER FUNCTIONS
 // ============================================================
 
+// Assigns the lowest available user number (1, 2, or 3).
+// If a user leaves, their number is recycled for the next user.
+function getAvailableUserNumber() {
+  const usedNumbers = new Set(
+    Array.from(publicChatUsers.values()).map((user) => user.userNumber)
+  );
+
+  for (let i = 1; i <= MAX_PUBLIC_CHAT_USERS; i++) {
+    if (!usedNumbers.has(i)) {
+      return i;
+    }
+  }
+
+  return null;
+}
+
 function getPublicChatUsers() {
-  return Array.from(publicChatUsers.values()).map((user) => ({
-    userId: user.userId,
-    userNumber: user.userNumber,
-    socketId: user.socketId,
-    joinedAt: user.joinedAt,
-  }));
+  return Array.from(publicChatUsers.values())
+    .map((user) => ({
+      userId: user.userId,
+      userNumber: user.userNumber,
+      socketId: user.socketId,
+      joinedAt: user.joinedAt,
+    }))
+    .sort((a, b) => a.userNumber - b.userNumber);
 }
 
 function getUserBySocketId(socketId) {
@@ -182,12 +195,15 @@ io.on("connection", (socket) => {
     purgeGhostUsers();
 
     // ========================================================
-    // HARD MAXIMUM CHECK (server-side)
-    // Strictly max 3 users limit. If reached, chat box cannot open.
-    // Runs BEFORE the user is stored and BEFORE socket.join().
+    // HARD MAXIMUM CHECK & SLOT ASSIGNMENT (server-side)
+    // Strictly max 3 users limit. Slots are always 1, 2, or 3.
+    // Early joiners get User 1, then User 2, then User 3.
+    // When someone leaves, their slot number is freed and reused.
     // ========================================================
 
-    if (publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS) {
+    const userNumber = getAvailableUserNumber();
+
+    if (!userNumber || publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS) {
       console.log(
         `Chat unavailable for ${socket.id}: limit reached (${publicChatUsers.size}/${MAX_PUBLIC_CHAT_USERS} users)`
       );
@@ -211,8 +227,6 @@ io.on("connection", (socket) => {
       `usr_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 10)}`;
-
-    const userNumber = nextUserNumber++;
 
     const user = {
       userId,
