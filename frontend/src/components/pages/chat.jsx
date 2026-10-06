@@ -2,7 +2,13 @@ import EmojiPicker from "emoji-picker-react";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("https://smartyhood-1.onrender.com", {
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://smartyhood-1.onrender.com");
+
+const socket = io(BACKEND_URL, {
   autoConnect: false,
 });
 
@@ -278,7 +284,11 @@ export default function Chat() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [chatAccess, setChatAccess] = useState("loading"); // "loading" | "allowed" | "full" | "error"
+  const [limitInfo, setLimitInfo] = useState({ maxUsers: 3, onlineUsers: 3, message: "" });
   const [onlineUsers, setOnlineUsers] = useState(0);
+  const [publicUsers, setPublicUsers] = useState([]);
+  // console.log("PUBLIC USERS:", publicUsers);
   const [typing, setTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [myId, setMyId] = useState("");
@@ -317,10 +327,41 @@ const [recording, setRecording] = useState(false);
       setConnected(false);
     };
 
+    const handleConnectError = (err) => {
+      console.error("Socket connection error:", err);
+      if (err?.message === "CHAT_FULL") {
+        setChatAccess("full");
+      } else {
+        setChatAccess("error");
+      }
+    };
+
+    const handleYourIdentity = (identity) => {
+      console.log("Admitted to chat room:", identity);
+      setConnected(true);
+      setChatAccess("allowed");
+    };
+
+    const handleChatUnavailable = (data) => {
+      console.warn("Chat unavailable - 3 users limit reached:", data);
+      setLimitInfo({
+        maxUsers: data?.maxUsers || 3,
+        onlineUsers: data?.onlineUsers || 3,
+        message: data?.message || "Public chat is currently full. Maximum 3 users are allowed.",
+      });
+      setChatAccess("full");
+      setConnected(false);
+      socket.disconnect();
+    };
+
     const handleOnlineUsers = (count) => {
       console.log("Online users:", count);
       setOnlineUsers(count);
     };
+
+    const handlePublicChatUsers = (users) => {
+  setPublicUsers(users);
+};
 
     const handleReceiveMessage = (data) => {
       console.log("Message received:", data);
@@ -362,12 +403,17 @@ const [recording, setRecording] = useState(false);
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnectError);
+    socket.on("your_identity", handleYourIdentity);
+    socket.on("chat_unavailable", handleChatUnavailable);
     socket.on("online_users", handleOnlineUsers);
+    socket.on("public_chat_users", handlePublicChatUsers);
     socket.on("receive_message", handleReceiveMessage);
     socket.on("message_deleted", handleMessageDeleted);
     socket.on("clear_chat", handleClearChat);
     socket.on("user_typing", handleTyping);
-  socket.on("user_left", handleUserLeft);
+    socket.on("user_left", handleUserLeft);
+
     socket.connect();
 
     return () => {
@@ -379,13 +425,16 @@ const [recording, setRecording] = useState(false);
 
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("your_identity", handleYourIdentity);
+      socket.off("chat_unavailable", handleChatUnavailable);
       socket.off("online_users", handleOnlineUsers);
+      socket.off("public_chat_users", handlePublicChatUsers);
       socket.off("receive_message", handleReceiveMessage);
       socket.off("message_deleted", handleMessageDeleted);
       socket.off("clear_chat", handleClearChat);
       socket.off("user_typing", handleTyping);
       socket.off("user_left", handleUserLeft);
-      
 
       socket.disconnect();
     };
@@ -1194,19 +1243,160 @@ const [recording, setRecording] = useState(false);
   .camera-box {
     width: 94vw;
   }
+
+  .chat-status-screen {
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .status-card {
+    background: #1a1a2e;
+    border: 1px solid #2d2d52;
+    border-radius: 18px;
+    padding: 36px 28px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+    animation: fadeUp 0.25s ease-out;
+  }
+
+  .status-spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(167, 139, 250, 0.2);
+    border-top-color: #a78bfa;
+    border-radius: 50%;
+    margin: 0 auto;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .status-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+
+  .status-btn.primary {
+    background: #6366f1;
+    color: white;
+  }
+
+  .status-btn.primary:hover {
+    background: #4f46e5;
+  }
+
+  .status-btn.secondary {
+    background: #2d2d52;
+    color: #e2e8f0;
+  }
+
+  .status-btn.secondary:hover {
+    background: #3d3d6e;
+  }
 }
       `}</style>
 
-      <div
-        className="chat-root"
-        onContextMenu={(e) => {
-          // Prevent context menu in chat.
-          e.preventDefault();
-        }}
-      >
+      {chatAccess === "loading" && (
+        <div className="chat-status-screen">
+          <div className="status-card">
+            <div className="status-spinner" />
+            <h3 style={{ color: "#e2e8f0", margin: "16px 0 8px", fontSize: "18px" }}>
+              Connecting to Chat...
+            </h3>
+            <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
+              Checking room limit (Max 3 users allowed)
+            </p>
+          </div>
+        </div>
+      )}
+
+      {chatAccess === "full" && (
+        <div className="chat-status-screen">
+          <div className="status-card">
+            <div style={{ fontSize: "52px", marginBottom: "16px" }}>🤖</div>
+            <h2 style={{ color: "#f87171", margin: "0 0 12px", fontSize: "22px", fontWeight: "700" }}>
+              Bot 🤖 AI Assistant
+            </h2>
+            <p style={{ color: "#cbd5e1", fontSize: "15px", lineHeight: 1.6, margin: "0 0 24px" }}>
+              Bot 🤖 AI Assistant is temporarily unavailable. Please try again later.
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button
+                onClick={() => { window.location.href = "/"; }}
+                className="status-btn secondary"
+              >
+                Back to Home
+              </button>
+              <button
+                onClick={() => {
+                  setChatAccess("loading");
+                  socket.connect();
+                }}
+                className="status-btn primary"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {chatAccess === "error" && (
+        <div className="chat-status-screen">
+          <div className="status-card">
+            <div style={{ fontSize: "52px", marginBottom: "16px" }}>⚠️</div>
+            <h2 style={{ color: "#f87171", margin: "0 0 12px", fontSize: "22px", fontWeight: "700" }}>
+              Connection Error
+            </h2>
+            <p style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: 1.6, margin: "0 0 24px" }}>
+              Unable to connect to the chat server right now.
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button
+                onClick={() => { window.location.href = "/"; }}
+                className="status-btn secondary"
+              >
+                Back to Home
+              </button>
+              <button
+                onClick={() => {
+                  setChatAccess("loading");
+                  socket.connect();
+                }}
+                className="status-btn primary"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {chatAccess === "allowed" && (
+        <>
+          <div
+          className="chat-root"
+          onContextMenu={(e) => {
+            // Prevent context menu in chat.
+            e.preventDefault();
+          }}
+        >
         <div className="chat-header">
           <div>
-            <div className="header-title">SmartyHood Chat</div>
+            <div className="header-title">SmartyHood ChatBot</div>
 
             <div className="header-sub">neet-general</div>
 
@@ -1221,7 +1411,27 @@ const [recording, setRecording] = useState(false);
               🟢 {onlineUsers} Users Online
             </div>
           </div>
+<div className="users-panel">
+  {publicUsers
+    .filter((user) => user.socketId !== myId)
+    .map((user) => (
+      <div className="user-row" key={user.userId}>
+        <span>
+          🟢 User {user.userNumber}
+        </span>
 
+        <button
+          onClick={() => {
+    socket.emit("call_user", {
+      targetUserId: user.userId,
+    });
+  }}
+        >
+          📞 Call
+        </button>
+      </div>
+    ))}
+</div>
           <div className="conn-pill">
             <div
               className="conn-dot"
@@ -1457,6 +1667,8 @@ const [recording, setRecording] = useState(false);
           </div>
         </div>
       )}
+    </>
+  )}
     </>
   );
 }

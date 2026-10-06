@@ -51,7 +51,7 @@ function Navbar() {
             </Link>
 
             <Link className="nav-link" to="/chat">
-              Chat
+              ChatBot
             </Link>
 
           </div>
@@ -92,7 +92,7 @@ function Navbar() {
               to="/chat"
               onClick={() => setMenuOpen(false)}
             >
-              Chat
+              ChatBot
             </Link>
 
           </div>

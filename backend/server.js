@@ -67,29 +67,22 @@ const io = new Server(server, {
 // ============================================================
 
 const PUBLIC_CHAT_ROOM = "neet-general";
+const MAX_PUBLIC_CHAT_USERS = 3;
 
-// Every user gets:
-// - internal anonymous ID
-// - display number
-// - socket ID
-//
-// Example:
-//
-// User 1
-// User 2
-// User 3
-//
-// The display number is NOT the real identity of the person.
-
-// Never reuse a number during the server lifetime.
+// Display numbers are never reused during the server lifetime.
+// NOTE: this is NOT the number of connected users. After a refresh a
+// user can become "User 4" even though only 3 people are online.
 let nextUserNumber = 1;
 
-// Store currently connected public-chat users.
-//
-// Map:
-// socket.id -> user information
-//
+// Currently connected public-chat users.
+// Map: socket.id -> user information
 const publicChatUsers = new Map();
+
+// ============================================================
+// PRIVATE CALLS
+// ============================================================
+
+const activeCalls = new Map();
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -108,12 +101,54 @@ function getUserBySocketId(socketId) {
   return publicChatUsers.get(socketId);
 }
 
+// Remove entries whose socket is no longer actually connected
+// (ghost slots from dropped connections), so they can't hold a seat.
+function purgeGhostUsers() {
+  for (const socketId of publicChatUsers.keys()) {
+    const s = io.sockets.sockets.get(socketId);
+    if (!s || !s.connected) {
+      console.log("Purged ghost public-chat user:", socketId);
+      publicChatUsers.delete(socketId);
+    }
+  }
+}
+
+// End every private call that involves this socket.
+function cleanupCallsForSocket(socketId) {
+  for (const [callId, call] of activeCalls.entries()) {
+    if (
+      call.callerSocketId === socketId ||
+      call.receiverSocketId === socketId
+    ) {
+      const otherSocket =
+        call.callerSocketId === socketId
+          ? call.receiverSocketId
+          : call.callerSocketId;
+
+      io.to(otherSocket).emit("call_ended", { callId });
+      activeCalls.delete(callId);
+    }
+  }
+}
+
 // ============================================================
 // SOCKET CONNECTION
 // ============================================================
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+
+  // Check availability without joining
+  socket.on("check_chat_availability", () => {
+    purgeGhostUsers();
+    const isFull = publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS;
+    socket.emit("chat_availability", {
+      available: !isFull,
+      canJoin: !isFull,
+      maxUsers: MAX_PUBLIC_CHAT_USERS,
+      onlineUsers: publicChatUsers.size,
+    });
+  });
 
   // ==========================================================
   // JOIN PUBLIC CHAT
@@ -122,15 +157,16 @@ io.on("connection", (socket) => {
   socket.on("join_room", (room) => {
     if (room !== PUBLIC_CHAT_ROOM) {
       console.log("Rejected unknown room:", room);
+      socket.emit("chat_unavailable", {
+        message: "Invalid chat room",
+        maxUsers: MAX_PUBLIC_CHAT_USERS,
+        onlineUsers: publicChatUsers.size,
+      });
       return;
     }
 
     // Prevent duplicate join
     if (publicChatUsers.has(socket.id)) {
-      console.log(
-        `Socket ${socket.id} already joined public chat`
-      );
-
       const existingUser = publicChatUsers.get(socket.id);
 
       socket.emit("your_identity", {
@@ -139,6 +175,31 @@ io.on("connection", (socket) => {
         displayName: `User ${existingUser.userNumber}`,
       });
 
+      return;
+    }
+
+    // Drop dead sockets so they can't occupy a slot.
+    purgeGhostUsers();
+
+    // ========================================================
+    // HARD MAXIMUM CHECK (server-side)
+    // Strictly max 3 users limit. If reached, chat box cannot open.
+    // Runs BEFORE the user is stored and BEFORE socket.join().
+    // ========================================================
+
+    if (publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS) {
+      console.log(
+        `Chat unavailable for ${socket.id}: limit reached (${publicChatUsers.size}/${MAX_PUBLIC_CHAT_USERS} users)`
+      );
+
+      socket.emit("chat_unavailable", {
+        message: "Bot 🤖 AI Assistant is temporarily unavailable. Please try again later.",
+        maxUsers: MAX_PUBLIC_CHAT_USERS,
+        onlineUsers: publicChatUsers.size,
+      });
+
+      // Disconnect socket immediately so 4th user cannot join
+      socket.disconnect(true);
       return;
     }
 
@@ -168,32 +229,20 @@ io.on("connection", (socket) => {
     socket.join(room);
 
     console.log(
-      `User ${userNumber} joined ${room}`
+      `User ${userNumber} joined ${room} (${publicChatUsers.size}/${MAX_PUBLIC_CHAT_USERS})`
     );
 
-    // ========================================================
-    // TELL USER WHO THEY ARE
-    // ========================================================
-
+    // Tell user who they are
     socket.emit("your_identity", {
       userId,
       userNumber,
       displayName: `User ${userNumber}`,
     });
 
-    // ========================================================
-    // SEND CURRENT USER COUNT
-    // ========================================================
+    // Send current user count
+    io.to(room).emit("online_users", publicChatUsers.size);
 
-    io.to(room).emit(
-      "online_users",
-      publicChatUsers.size
-    );
-
-    // ========================================================
-    // INFORM OTHER USERS
-    // ========================================================
-
+    // Inform other users
     socket.to(room).emit("user_joined", {
       userId,
       userNumber,
@@ -201,14 +250,8 @@ io.on("connection", (socket) => {
       joinedAt: user.joinedAt,
     });
 
-    // ========================================================
-    // SEND USER LIST
-    // ========================================================
-
-    io.to(room).emit(
-      "public_chat_users",
-      getPublicChatUsers()
-    );
+    // Send user list
+    io.to(room).emit("public_chat_users", getPublicChatUsers());
   });
 
   // ==========================================================
@@ -229,9 +272,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // IMPORTANT:
     // Never trust sender information coming from frontend.
-    //
     // The server decides who sent the message.
 
     const message = {
@@ -268,10 +309,7 @@ io.on("connection", (socket) => {
       message.type
     );
 
-    io.to(PUBLIC_CHAT_ROOM).emit(
-      "receive_message",
-      message
-    );
+    io.to(PUBLIC_CHAT_ROOM).emit("receive_message", message);
   });
 
   // ==========================================================
@@ -294,31 +332,18 @@ io.on("connection", (socket) => {
       data.messageId
     );
 
-    // For now, users can delete only their own messages.
-    //
-    // ADMIN deletion will be added later and will have
-    // separate server-side authorization.
-
+    // Users can delete only their own messages.
     if (data.sender !== socket.id) {
-      console.log(
-        `Delete rejected for User ${user.userNumber}`
-      );
-
+      console.log(`Delete rejected for User ${user.userNumber}`);
       return;
     }
 
-    io.to(PUBLIC_CHAT_ROOM).emit(
-      "message_deleted",
-      {
-        messageId: data.messageId,
-
-        userId: user.userId,
-
-        userNumber: user.userNumber,
-
-        sender: socket.id,
-      }
-    );
+    io.to(PUBLIC_CHAT_ROOM).emit("message_deleted", {
+      messageId: data.messageId,
+      userId: user.userId,
+      userNumber: user.userNumber,
+      sender: socket.id,
+    });
   });
 
   // ==========================================================
@@ -336,12 +361,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    socket.to(PUBLIC_CHAT_ROOM).emit(
-      "user_typing",
-      {
-        userNumber: user.userNumber,
-      }
-    );
+    socket.to(PUBLIC_CHAT_ROOM).emit("user_typing", {
+      userNumber: user.userNumber,
+    });
   });
 
   // ==========================================================
@@ -359,39 +381,287 @@ io.on("connection", (socket) => {
       return;
     }
 
-    console.log(
-      `User ${user.userNumber} left ${room}`
-    );
+    console.log(`User ${user.userNumber} left ${room}`);
 
-    // Remove server-side user
+    // Remove server-side user (frees the slot)
     publicChatUsers.delete(socket.id);
+
+    // End any private call this user was in
+    cleanupCallsForSocket(socket.id);
 
     // Leave Socket.IO room
     socket.leave(room);
 
-    // IMPORTANT:
-    //
-    // DO NOT clear the chat for everyone.
-    //
-    // One user leaving must not delete everyone's messages.
+    // One user leaving must not clear the chat for everyone.
 
-    io.to(room).emit(
-      "user_left",
-      {
-        userId: user.userId,
-        userNumber: user.userNumber,
-      }
+    io.to(room).emit("user_left", {
+      userId: user.userId,
+      userNumber: user.userNumber,
+    });
+
+    io.to(room).emit("online_users", publicChatUsers.size);
+
+    io.to(room).emit("public_chat_users", getPublicChatUsers());
+  });
+
+  // ==========================================================
+  // PRIVATE CALLING SYSTEM
+  // ==========================================================
+
+  // ----------------------------------------------------------
+  // CALL USER
+  // ----------------------------------------------------------
+
+  socket.on("call_user", (data) => {
+    const caller = getUserBySocketId(socket.id);
+
+    if (!caller) {
+      console.log("Call rejected: caller is not in public chat");
+      return;
+    }
+
+    if (!data || !data.targetUserId) {
+      console.log("Call rejected: target user missing");
+      return;
+    }
+
+    // Find the receiver using the SERVER'S user ID.
+    const receiver = Array.from(publicChatUsers.values()).find(
+      (user) => user.userId === data.targetUserId
     );
 
-    io.to(room).emit(
-      "online_users",
-      publicChatUsers.size
+    if (!receiver) {
+      console.log("Call rejected: target user is not online");
+      return;
+    }
+
+    // Prevent calling yourself.
+    if (receiver.socketId === socket.id) {
+      return;
+    }
+
+    const callId =
+      `call_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 12)}`;
+
+    activeCalls.set(callId, {
+      callerSocketId: socket.id,
+      receiverSocketId: receiver.socketId,
+    });
+
+    console.log(
+      `Private call: User ${caller.userNumber} -> User ${receiver.userNumber}`
     );
 
-    io.to(room).emit(
-      "public_chat_users",
-      getPublicChatUsers()
-    );
+    // Only the selected receiver gets this event.
+    io.to(receiver.socketId).emit("incoming_call", {
+      callId,
+
+      caller: {
+        userId: caller.userId,
+        userNumber: caller.userNumber,
+        displayName: `User ${caller.userNumber}`,
+      },
+    });
+  });
+
+  // ----------------------------------------------------------
+  // ACCEPT CALL
+  // ----------------------------------------------------------
+
+  socket.on("accept_call", (data) => {
+    if (!data || !data.callId) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    // Only the intended receiver can accept.
+    if (call.receiverSocketId !== socket.id) {
+      return;
+    }
+
+    io.to(call.callerSocketId).emit("call_accepted", {
+      callId: data.callId,
+    });
+
+    console.log(`Call accepted: ${data.callId}`);
+  });
+
+  // ----------------------------------------------------------
+  // REJECT CALL
+  // ----------------------------------------------------------
+
+  socket.on("reject_call", (data) => {
+    if (!data || !data.callId) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    if (
+      socket.id !== call.callerSocketId &&
+      socket.id !== call.receiverSocketId
+    ) {
+      return;
+    }
+
+    const otherSocket =
+      socket.id === call.callerSocketId
+        ? call.receiverSocketId
+        : call.callerSocketId;
+
+    io.to(otherSocket).emit("call_rejected", {
+      callId: data.callId,
+    });
+
+    activeCalls.delete(data.callId);
+
+    console.log(`Call rejected: ${data.callId}`);
+  });
+
+  // ----------------------------------------------------------
+  // WEBRTC OFFER
+  // ----------------------------------------------------------
+
+  socket.on("webrtc_offer", (data) => {
+    if (!data || !data.callId || !data.offer) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    if (
+      socket.id !== call.callerSocketId &&
+      socket.id !== call.receiverSocketId
+    ) {
+      return;
+    }
+
+    const otherSocket =
+      socket.id === call.callerSocketId
+        ? call.receiverSocketId
+        : call.callerSocketId;
+
+    io.to(otherSocket).emit("webrtc_offer", {
+      callId: data.callId,
+      offer: data.offer,
+    });
+  });
+
+  // ----------------------------------------------------------
+  // WEBRTC ANSWER
+  // ----------------------------------------------------------
+
+  socket.on("webrtc_answer", (data) => {
+    if (!data || !data.callId || !data.answer) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    if (
+      socket.id !== call.callerSocketId &&
+      socket.id !== call.receiverSocketId
+    ) {
+      return;
+    }
+
+    const otherSocket =
+      socket.id === call.callerSocketId
+        ? call.receiverSocketId
+        : call.callerSocketId;
+
+    io.to(otherSocket).emit("webrtc_answer", {
+      callId: data.callId,
+      answer: data.answer,
+    });
+  });
+
+  // ----------------------------------------------------------
+  // WEBRTC ICE CANDIDATE
+  // ----------------------------------------------------------
+
+  socket.on("webrtc_ice_candidate", (data) => {
+    if (!data || !data.callId || !data.candidate) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    if (
+      socket.id !== call.callerSocketId &&
+      socket.id !== call.receiverSocketId
+    ) {
+      return;
+    }
+
+    const otherSocket =
+      socket.id === call.callerSocketId
+        ? call.receiverSocketId
+        : call.callerSocketId;
+
+    io.to(otherSocket).emit("webrtc_ice_candidate", {
+      callId: data.callId,
+      candidate: data.candidate,
+    });
+  });
+
+  // ----------------------------------------------------------
+  // END CALL
+  // ----------------------------------------------------------
+
+  socket.on("end_call", (data) => {
+    if (!data || !data.callId) {
+      return;
+    }
+
+    const call = activeCalls.get(data.callId);
+
+    if (!call) {
+      return;
+    }
+
+    if (
+      socket.id !== call.callerSocketId &&
+      socket.id !== call.receiverSocketId
+    ) {
+      return;
+    }
+
+    const otherSocket =
+      socket.id === call.callerSocketId
+        ? call.receiverSocketId
+        : call.callerSocketId;
+
+    io.to(otherSocket).emit("call_ended", {
+      callId: data.callId,
+    });
+
+    activeCalls.delete(data.callId);
+
+    console.log(`Call ended: ${data.callId}`);
   });
 
   // ==========================================================
@@ -399,32 +669,25 @@ io.on("connection", (socket) => {
   // ==========================================================
 
   socket.on("disconnect", (reason) => {
+    // Always clean up calls, even if the socket was never in the chat.
+    cleanupCallsForSocket(socket.id);
+
     const user = getUserBySocketId(socket.id);
 
     if (!user) {
-      console.log(
-        "Socket disconnected:",
-        socket.id,
-        reason
-      );
-
+      console.log("Socket disconnected:", socket.id, reason);
       return;
     }
 
-    console.log(
-      `User ${user.userNumber} disconnected:`,
-      reason
-    );
+    console.log(`User ${user.userNumber} disconnected:`, reason);
 
+    // Frees the slot
     publicChatUsers.delete(socket.id);
 
-    io.to(PUBLIC_CHAT_ROOM).emit(
-      "user_left",
-      {
-        userId: user.userId,
-        userNumber: user.userNumber,
-      }
-    );
+    io.to(PUBLIC_CHAT_ROOM).emit("user_left", {
+      userId: user.userId,
+      userNumber: user.userNumber,
+    });
 
     io.to(PUBLIC_CHAT_ROOM).emit(
       "online_users",
@@ -447,14 +710,36 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================
-// ADMIN TEST ROUTE
+// STATUS ROUTE
 // ============================================================
 
 app.get("/api/chat/status", (req, res) => {
+  purgeGhostUsers();
+
+  const isFull = publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS;
+
   res.json({
     room: PUBLIC_CHAT_ROOM,
+    maxUsers: MAX_PUBLIC_CHAT_USERS,
     onlineUsers: publicChatUsers.size,
+    isFull,
+    canJoin: !isFull,
+    connectedSockets: io.engine.clientsCount,
     users: getPublicChatUsers(),
+  });
+});
+
+app.get("/api/chat/can-join", (req, res) => {
+  purgeGhostUsers();
+
+  const isFull = publicChatUsers.size >= MAX_PUBLIC_CHAT_USERS;
+
+  res.json({
+    room: PUBLIC_CHAT_ROOM,
+    canJoin: !isFull,
+    isFull,
+    maxUsers: MAX_PUBLIC_CHAT_USERS,
+    onlineUsers: publicChatUsers.size,
   });
 });
 
@@ -462,11 +747,8 @@ app.get("/api/chat/status", (req, res) => {
 // START SERVER
 // ============================================================
 
-const PORT =
-  process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(
-    `Server running on port ${PORT}`
-  );
+  console.log(`Server running on port ${PORT}`);
 });
